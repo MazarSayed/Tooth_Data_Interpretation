@@ -5,10 +5,30 @@ from utils import (
     get_llm_output, extract_metadata, extract_table
 )
 
+
 st.set_page_config(page_title="Dental X-ray Insight Report", page_icon="🦷", layout="wide")
 st.title("🦷 Dental Radiology AI Reporter")
 
-openai_api_key = load_api_key()
+# === 1. Sidebar: LLM Selection ===
+st.sidebar.markdown("### 🤖 Choose LLM Model")
+llm_model = st.sidebar.selectbox(
+    "Select a language model:",
+    ["gpt-4o (OpenAI)", "gemini-2.5-pro (Google)", "gpt-3.5-turbo (OpenAI)"],
+    index=0
+)
+
+# === 2. Map LLM name to backend details ===
+model_mapping = {
+    "gpt-4o (OpenAI)": {"provider": "openai", "model": "gpt-4o"},
+    "gemini-2.5-pro (Google)": {"provider": "gemini", "model": "gemini-2.5-pro-preview-06-05"},
+    "gpt-3.5-turbo (OpenAI)": {"provider": "openai", "model": "gpt-3.5-turbo"}
+}
+selected_model = model_mapping[llm_model]
+
+# === 3. Load API Key for the selected provider ===
+api_key = load_api_key(provider=selected_model["provider"])  # You must update load_api_key() to accept a provider
+
+# === 4. Upload and Process Image ===
 uploaded_file = st.file_uploader("Upload a dental X-ray image", type=["png", "jpg", "jpeg"])
 
 if uploaded_file:
@@ -20,10 +40,10 @@ if uploaded_file:
     st.markdown("### 📸 Scan Overview")
     st.image(annotated_path, caption="YOLO Output", width=400)
 
-    if openai_api_key:
-        with st.spinner("Generating report with LLM..."):
+    if api_key:
+        with st.spinner(f"Generating report with {llm_model}..."):
             prompt_path = os.path.join("prompt", "dental_report_prompt.txt")
-            llm_output = get_llm_output(openai_api_key, prompt_path)
+            llm_output = get_llm_output(api_key, prompt_path, selected_model)  # You must update this function
 
         scan_type, scan_tool, exam_date = extract_metadata(llm_output)
         st.markdown("### 🦷 Patient Dental Report")
@@ -35,9 +55,7 @@ if uploaded_file:
             st.dataframe(df_markdown)
             st.markdown("---")
             st.warning("⚠️ This AI-generated report is for informational purposes only. Final diagnosis and treatment decisions must be made by a qualified dental professional.")
-
         else:
             st.warning("⚠️ No markdown table found in LLM output.")
     else:
-        st.warning("🔐 OpenAI API key not found in `.env` file.")
-
+        st.warning("🔐 API key not found for selected model.")

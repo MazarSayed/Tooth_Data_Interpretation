@@ -4,12 +4,12 @@ import pandas as pd
 from PIL import Image
 from ultralytics import YOLO
 from dotenv import load_dotenv
-import openai
-
+from openai import OpenAI
+import google.generativeai as genai
 # === Load API Key ===
-def load_api_key():
+def load_api_key(provider="openai"):
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
-    return os.getenv("OPENAI_API_KEY")
+    return os.getenv("OPENAI_API_KEY") if provider == "openai" else os.getenv("GEMINI_API_KEY")
 
 # === Save Uploaded Image ===
 def save_uploaded_image(uploaded_file):
@@ -41,17 +41,36 @@ def parse_yolo_output(results, model):
     return "\n".join(detections) if detections else "No objects detected."
 
 # === Get LLM Output ===
-def get_llm_output(openai_api_key, prompt_path):
-    client = openai.OpenAI(api_key=openai_api_key)
+def get_llm_output(api_key, prompt_path, model_info):
+    provider = model_info["provider"]
+    model_name = model_info["model"]
+
     with open(prompt_path, "r", encoding="utf-8") as file:
         prompt = file.read()
 
-    response = client.chat.completions.create(
-        model="gpt-4-0125-preview",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-    return response.choices[0].message.content
+    if provider == "openai":
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0
+        )
+        return response.choices[0].message.content
+
+    elif provider == "gemini":
+        try:
+            import google.generativeai as genai
+        except ImportError:
+            raise ImportError("Please install `google-generativeai` to use Gemini models.")
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        return response.text
+
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
+
 
 # === Extract Metadata from LLM Output ===
 def extract_metadata(llm_output):
