@@ -16,3 +16,7 @@ __pycache__/
 
 # VSCode settings (optional)
 .vscode/
+
+
+# === Model files ===
+*.h5
